@@ -3,7 +3,8 @@ from nba_api.stats.static import teams
 from nba_api.stats.endpoints import leaguegamefinder
 from nba_api.stats.library.parameters import Season
 from nba_api.stats.library.parameters import SeasonType
-from nba_api.stats.endpoints import playbyplay
+from nba_api.stats.endpoints import playbyplayv3
+import isodate
 import time
 import re
 import pandas as pd
@@ -26,9 +27,10 @@ games = games_dict['LeagueGameFinderResults']
 # Get play by play from found games 
 
 dfs = []
+
 for game in games:
-    dfs.append(playbyplay.PlayByPlay(game['GAME_ID']).get_data_frames()[0])
-    time.sleep(1) # avoid hitting rate limit
+    dfs.append(playbyplayv3.PlayByPlayV3(game_id = game['GAME_ID']).get_data_frames()[0])
+    time.sleep(2) # avoid hitting rate limit
 
 # connect to database
 
@@ -42,16 +44,6 @@ conn = psycopg2.connect(
 # Open cursor to perform database operations
 cur = conn.cursor()
 
-# --- EVENT CODES ---
-# 1 - made shot
-# 2 - missed shot
-# 3 - free throw, missed free throw starts with MISS
-# 4 - rebound, denoting offensive or defensive
-# 5 - steals and turnovers
-# 6 - foul perpretrator and fouled
-# 7 - goaltending?
-# 8 - substitution
-
 # final_df contains all of the playbyplay info for the specified timeframe that we need to go through
 
 # https://github.com/swar/nba_api/blob/master/docs/examples/PlayByPlay.ipynb sourced for play by play endpoint usage
@@ -59,42 +51,34 @@ cur = conn.cursor()
 # -- IN THE FUTURE, SET UP SUPPORT FOR SHOT CHART DETAIL ENDPOINT WHICH WILL GIVE COORDINATES AND MORE ACCURATE SHOT LOCATION INFORMATION
 
 
+
 final_df = pd.concat(dfs, ignore_index=True)
+game_teams = (
+    final_df[['gameId', 'location', 'teamId']]
+    .drop_duplicates()
+    .pivot(index='game_id', columns='location', values='teamId')
+    .rename(columns={'h': 'home_team_id', 'v': 'visiting_team_id'})
+)
+final_df = final_df.merge(game_teams, on='game_id', how='left')
 for index, row in final_df.iterrows():
-    if row['EVENTMSGTYPE'] == 1:
-        # made shot
-        game_id = row['GAME_ID']
-        event_num = row['EVENTNUM']
-        event_type = "MADE SHOT"
-        event_subtype = "UNKNOWN"
-        shot_distance = None
+    # retooling with v3 endpoint its way better
+    if row['isFieldGoal'] == 1:
+        game_id = row['gameId']
+        event_num = row['actionNumber']
+        event_type = row['actionType']
+        event_subtype = row['subType']
+        season = row['season'] # must add manually
+        season_type = row['season_type'] # must add manually
+        period = row['period']
+        posession_team_id = row['teamId']
+        primary_player_id = row['personId']
+        home_team_id = row['home_team_id']
+        away_team_id = row['visiting_team_id']
+        
 
-        # used to search for event subtype 
-        p = re.compile(r"(\s{2}|\' )([\w+ ]*)")
-        description = row['HOMEDESCRIPTION'] or row['VISITORDESCRIPTION']
-        if description:
-            match = p.search(description)
-            if match:
-                event_subtype = match.group(2).rstrip().replace(' ', '_').upper()
-            foot_match = re.search(r"(\d+)'", description)
-            if foot_match:
-                shot_distance = int(foot_match.group(1))
-            elif "3PT" in description: # for now, I'm going to use a stand in value for 3 point shots with unkown distancee
-                shot_distance = 24
+        
 
-        season = row['SEASON']
-        season_type = row['SEASON_TYPE']
-        period = row['PERIOD']
-        clock = row['PCTIMESTRING']
-        home_team_id = row['HOME_TEAM_ID']
-        away_team_id = row['AWAY_TEAM_ID']
-        possession_team_id = row['POSESSION_TEAM_ID']
-        primary_player_id = row['PRIMARY_PLAYER_ID']
 
-        # then add to database
-        # this gives us shot distances, made shots, can ask questions like which player has scored the most shots on the pacers this year within 12 feet
-
-        # for this we also need a table that links players to ids and teams to ids so lets figure that out
 
 
 

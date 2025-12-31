@@ -1,8 +1,21 @@
 CREATE TABLE Player
 (
     player_id INT PRIMARY KEY,
-    player_name VARCHAR(256)
+    player_full_name VARCHAR(256),
+    player_first_name VARCHAR(256),
+    player_last_name VARCHAR(256),
+    player_is_active BOOLEAN
 );
+
+CREATE TABLE Team
+(
+    team_id INT PRIMARY KEY,
+    team_full_name VARCHAR(256),
+    team_abbreviation VARCHAR(256),
+    team_nickname VARCHAR(256),
+    team_city VARCHAR(256)
+);
+
 
 CREATE TABLE Games
 (
@@ -46,7 +59,8 @@ CREATE TABLE pbp_raw_events (
 
   -- Shot context
   shot_type          TEXT,                     -- JUMPER, LAYUP, DUNK, FT
-  shot_distance      INTEGER,                  -- feet
+  shot_x             INTEGER,                  
+  shot_y             INTEGER,
   shot_zone          TEXT,
   is_three           BOOLEAN,
   is_assisted        BOOLEAN,
