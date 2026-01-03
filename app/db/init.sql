@@ -27,7 +27,6 @@ CREATE TABLE Game
 );
 
 CREATE TABLE pbp_raw_event_shots (
-  -- Identity
   game_id            BIGINT NOT NULL REFERENCES Game(game_id),
   event_num          INTEGER NOT NULL,    
   event_type         TEXT NOT NULL,  
