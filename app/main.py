@@ -54,7 +54,7 @@ def execute_sql(query: str):
     finally:
         cur.close()
         conn.close()
-        
+
 SCHEMA = ""
 schema_path = "text/schema.txt"
 try:
@@ -113,7 +113,13 @@ def get_sql_from_question(question: str):
 
     6. SO IMPORTANTLY, THE CURRENT season_id IS 22025 !!
 
-    7. EVER USE MAX(season_id) TO DEDUCE THE CURRENT SEASON
+    7. NEVER USE MAX(season_id) TO DEDUCE THE CURRENT SEASON!! (IMPORTANT)
+
+    8. assister_id can be used to lookup whoever assisted the given shot
+    
+    9. GIVE YOUR ANSWER AS PLAIN TEXT WITH NO MARKDOWN OR OTHER CHARACTERS, THIS WILL BREAK THE PROCESS. NEVER INCLUDE MARKDOWN IN YOUR RESPONSE
+
+    10. PRIORITIZE CORRECTNESS
 
     Generate a valid SQL SELECT query to answer the user question: This query should be immediately runnable
     without removing text or stripping whitespace. Do not elaborate beyond the query, this is detrimental to the
@@ -123,9 +129,11 @@ def get_sql_from_question(question: str):
     SQL:
     """
     response = client.responses.create(
-        model="gpt-5-nano",
+        model="gpt-5.2",
         input=prompt,
-        store=True
+        reasoning={
+            "effort": "medium"
+        }
     )
     sql = response.output_text.strip()
     sql = sql.split("```")[0].strip()
@@ -148,7 +156,7 @@ def interpret_sql_response(response: str, query: str, question: str):
     Based on this, please provide a concise summary of the answer for the user
     """
     completion = client.responses.create(
-        model="gpt-4-turbo",
+        model="gpt-5.2",
         input=prompt
     )
     answer = completion.output_text.strip()

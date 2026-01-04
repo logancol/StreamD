@@ -30,7 +30,7 @@ CREATE TABLE pbp_raw_event_shots (
   game_id            BIGINT NOT NULL REFERENCES Game(game_id),
   event_num          INTEGER NOT NULL,    
   event_type         TEXT NOT NULL,  
-  event_subtype      TEXT,     
+  event_subtype      TEXT,    
 
   -- Game context
   season             INTEGER NOT NULL,
@@ -48,6 +48,7 @@ CREATE TABLE pbp_raw_event_shots (
   -- Shot context
   shot_x             INTEGER,                  
   shot_y             INTEGER,
+  assister_id        INTEGER,
   is_three           BOOLEAN,
   shot_made          BOOLEAN,
   points             INTEGER,

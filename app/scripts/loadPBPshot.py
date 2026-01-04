@@ -9,6 +9,44 @@ import isodate
 import time
 import re
 import pandas as pd
+import unicodedata
+
+def remove_accents(s: str) -> str:
+    if not isinstance(s, str):
+        return s
+    return (
+        unicodedata.normalize("NFKD", s)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+
+def parse_description_assist(df: pd.DataFrame, description: str, teamId: int) -> str:
+    assister = ""
+    match = re.search(r'\(([^)]+?)\s\d+\sAST\)', description) # pull assister name from shot description
+    if match:
+        assister = match.group(1)
+    else:
+        return None
+    
+    # get id for assister from pbp data in the same game
+    # match either the player name or identifying name
+    
+    player_name_cond = df['playerName'].apply(remove_accents) == assister
+    player_name_I_cond = df['playerNameI'].apply(remove_accents) == assister
+        
+    # confirm the event we're using to get the id for the assisting player is related to the assisting team
+    team_id_cond = df['teamId'] == teamId
+    
+    combined = (player_name_cond | player_name_I_cond) & team_id_cond
+    filtered = df[combined]
+    assister_id = None
+    if not filtered.empty:
+        assister_id = filtered.iloc[0]['personId']
+    else:
+        assister_id = None
+    return assister_id
+        
+
 def iso8601_to_sql_interval(duration: str) -> str:
     pattern = r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?'
     match = re.match(pattern, duration)
@@ -70,6 +108,7 @@ for index, row in final_df.iterrows():
     count += 1
     if row['isFieldGoal'] == 1:
         try:
+            assist_id = None
             print(f'Storing pbp shooting event {count} of {total}')
             game_id = row['gameId']
             event_num = row['actionNumber']
@@ -90,15 +129,18 @@ for index, row in final_df.iterrows():
             is_three = row['shotValue'] == 3
             shot_made = row['shotResult'] == 'Made'
             points = row['shotValue'] if row['shotResult'] == 'Made' else 0
-
+            if row['shotResult'] == 'Made':
+                result = parse_description_assist(final_df[final_df['gameId'] == game_id], row['description'], row['teamId'])
+                if result:
+                    assist_id = int(result)
             print(f'Inserting pbp shooting event {count} of {total} with teams {home_team_id}, and {away_team_id}')
-
-            cur.execute("INSERT INTO pbp_raw_event_shots (game_id, event_num, event_type, " \
-            "event_subtype, season, season_type, period, clock, home_team_id, away_team_id, " \
-            "possession_team_id, primary_player_id, shot_x, shot_y, home_score, away_score, is_three, shot_made, points) VALUES (" \
-            "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (game_id, event_num, event_type,
-            event_subtype, season, season_type, period, clock, home_team_id, away_team_id, posession_team_id, 
-            primary_player_id, shot_x, shot_y, home_score, away_score, is_three, shot_made, points))
+            print(f'ASSISTER ID {assist_id}')
+            cur.execute(
+                "INSERT INTO pbp_raw_event_shots (game_id, event_num, event_type, event_subtype, season, season_type, period, clock, home_team_id, away_team_id, possession_team_id, primary_player_id, shot_x, shot_y, home_score, away_score, assister_id, is_three, shot_made, points) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (game_id, event_num, event_type, event_subtype, season, season_type, period, clock, home_team_id, away_team_id,
+                posession_team_id, primary_player_id, shot_x, shot_y, home_score, away_score, assist_id, is_three, shot_made, points)
+            )
         except psycopg2.Error as e:
             print(e)
 conn.commit()
