@@ -1,5 +1,6 @@
-import psycopg2
+import psycopg
 import logging
+import random
 import time
 from app.core.config import settings
 from nba_api.stats.endpoints import TeamDetails
@@ -8,18 +9,15 @@ import sys
 class TeamLoader:
     def __init__(self, db_conn):
         self.conn = db_conn
-        self.cur = db_conn.cursor()
 
-        # Working with team ids, abbreviations, and nicknames can be confusion, as there are instances with teams having the same id and abrev but different nicknames, etc. 
-        # For now, I'm going to manage these personally since there's only in the range of 30-40 "teams" in the pbp era that I need to be concerned about 
-
+        # API has some weird edge cases with team ids so for now I'm going to manage all of this manually
         self.team_ids = [1610612766,1610612764,1610612759,1610612751,1610612739,1610612738,1610612758,
             1610612765,1610612747,1610612762,1610612749,1610612757,1610612761,1610612745,
             1610612754,1610612737,1610612741,1610612746,1610612742,1610612750,1610612756,
             1610612755,1610612752,1610612743,1610612753,1610612744,1610612763,1610612748,
             1610612760,1610612763,1610612740,1610612766,1610612740,1610612760,1610612751,
             1610612740]
-        # abreviation to team id conversions for the play by play era
+
         self.abrev_id_map = {'ATL': 1610612737, 'BKN': 1610612751,'BOS': 1610612738,'CHA': 1610612766,'CHH': 1610612766,'CHI': 1610612741,'CLE': 1610612739,
                              'DAL': 1610612742,'DEN': 1610612743,'DET': 1610612765,'GSW': 1610612744,'HOU': 1610612745,'IND': 1610612754,'LAC': 1610612746,
                              'LAL': 1610612747,'MEM': 1610612763,'MIA': 1610612748,'MIL': 1610612749,'MIN': 1610612750,'NJN': 1610612751,'NOH': 1610612740,
@@ -36,20 +34,33 @@ class TeamLoader:
         self.team_ids = list(set(self.team_ids))
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
-        stream_handler = logging.StreamHandler(sys.stdout)
-        log_formatter = logging.Formatter("%(asctime)s [%(processName)s: %(process)d] [%(threadName)s: %(thread)d] [%(levelname)s] %(name)s: %(message)s")
-        stream_handler.setFormatter(log_formatter)
-        self.logger.addHandler(stream_handler)
+        if not self.logger.handlers:
+            stream_handler = logging.StreamHandler(sys.stdout)
+            log_formatter = logging.Formatter("%(asctime)s [%(processName)s: %(process)d] [%(threadName)s: %(thread)d] [%(levelname)s] %(name)s: %(message)s")
+            stream_handler.setFormatter(log_formatter)
+            self.logger.addHandler(stream_handler)
 
-    def load_historical_teams(self):
-        success = True
-        for id in self.team_ids:
+    def _with_retry(self, fn, desc: str, max_attempts: int = 6, base_sleep: float = 0.5, max_sleep: float = 60.0):
+        delay = base_sleep
+        for call_attempt in range(1, max_attempts + 1):
             try:
-                df = TeamDetails(team_id = id).get_data_frames()
-            except Exception:
-                self.logger.error(f"====== ISSUE WITH NBA API GETTING TEAM HISTORICAL TEAM DETAILS FOR TEAM WITH ID: {id} ======")
-                success = False
-                break
+                return fn()
+            except Exception as e:
+                if call_attempt == max_attempts:
+                    self.logger.error(f"====== FATAL ERROR WORKING WITH NBA API, ROLLING BACK ======: {e}")
+                    raise
+                else:
+                    self.logger.warning(f"====== Problem with NBA API fetching {desc} Attempt {call_attempt} out of {max_attempts}: {e} ======")
+                jitter = random.uniform(0, 0.5 * delay)
+                time.sleep(delay + jitter)
+                delay = min(delay * 2, max_sleep)
+
+    def load_historical_teams(self, cur):
+        for id in self.team_ids:
+            df = self._with_retry(
+                lambda: TeamDetails(team_id = id).get_data_frames(),
+                desc=f"Historical team data for team: {id}"
+            )
             historical = df[1]
             for _, row in historical.iterrows():
                 self.logger.info(f"====== STORING HISTORICAL TEAM INDEX FOR TEAM WITH ID: {id} ======")
@@ -58,46 +69,33 @@ class TeamLoader:
                 if row['YEARACTIVETILL'] == historical['YEARACTIVETILL'].max():
                     current_iteration = True
                 try:
-                    self.cur.execute("INSERT INTO historical_team_index (id, current_iteration, city, nickname, year_founded, year_active_til) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING;", 
+                    cur.execute("INSERT INTO historical_team_index (id, current_iteration, city, nickname, year_founded, year_active_til) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING;", 
                             (id, current_iteration, row['CITY'], row['NICKNAME'], row['YEARFOUNDED'], row['YEARACTIVETILL']))
-                except Exception:
+                except psycopg.Error:
                     self.logger.error(f"====== ERROR STORING HISTORICAL TEAM INDEX FOR TEAM WITH ID: {id} ======")
-                    success = False
-                    break
-            if not success: 
-                break
+                    raise
             time.sleep(.2)
-        if success:
-            self.conn.commit()
-            self.logger.info(f"====== COMMITED CHANGES TO DATABASE ======")
 
-    def load_modern_teams(self):
-        success = True
+    def load_modern_teams(self, cur):
         for abrev in self.abrev_id_map.keys():
             self.logger.info(f"====== STORING MODERN TEAM INDEX FOR TEAM WITH ABBREVIATION: {abrev} ======")
             id = self.abrev_id_map[abrev]
             nickname = self.abrev_nickname_map[abrev]
             try:
-                self.cur.execute("INSERT INTO modern_team_index (id, abrev, nickname) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (id, abrev, nickname))
-            except Exception as e:
+                cur.execute("INSERT INTO modern_team_index (id, abrev, nickname) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (id, abrev, nickname))
+            except psycopg.Error as e:
                 self.logger.error(f"====== ERROR STORING MODERN TEAM INDEX FOR TEAM WITH ABBREVIATION: {abrev} ERROR: {e} ======")
-                success = False
-                break
-        if success: 
-            self.conn.commit()
-            self.logger.info(f"====== COMMITED CHANGES TO DATABASE ======")
-    
-    def close_connection(self):
-        self.conn.close()
-            
+                raise
 
 def main():
     DB_URL = settings.DATABASE_URL
-    conn = psycopg2.connect(DB_URL)
-    loader = TeamLoader(conn)
-    loader.load_historical_teams()
-    loader.load_modern_teams()
-    loader.close_connection()
+    with psycopg.connect(DB_URL) as conn:
+        with conn.transaction():
+            loader = TeamLoader(conn)
+            with conn.cursor() as cur:
+                loader.load_historical_teams(cur)
+                loader.load_modern_teams(cur)
+
 
 if __name__ == '__main__':
     main()

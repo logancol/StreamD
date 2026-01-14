@@ -89,6 +89,8 @@ CREATE TABLE game_team_performance
 
 CREATE TABLE pbp_raw_event(
     game_id BIGINT REFERENCES game(id),
+    season_id INT,
+    season_type TEXT,
     event_num INT NOT NULL,    
     event_type TEXT NOT NULL,  
     event_subtype TEXT,    

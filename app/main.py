@@ -10,7 +10,7 @@ from app.auth.token import Token
 from app.db.db import get_async_pool, get_pool
 from app.api.questions import router as questions_router
 
-# Logger setup
+# Global logging config for api
 logging.basicConfig(
     level=logging.INFO,
     stream=sys.stdout,
@@ -35,11 +35,11 @@ async def lifespan(app: FastAPI):
         logger.error(f"====== Schema file not found: {schema_path} ======")
         return
     get_pool().open()
-    await get_async_pool().open()
+    await get_async_pool().open() # open sync and async connection pools
     try:
         yield
     finally:
-        await get_async_pool().close()
+        await get_async_pool().close() # close sync and async connection pools end of life
         get_pool().close()
 app = FastAPI(lifespan=lifespan, title="BBALL ORACLE")
 

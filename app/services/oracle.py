@@ -24,15 +24,6 @@ class Oracle():
         if 'select' not in lower_query:
             self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED NON-SELECTING QUERY ======")
             return ""
-
-        bad_words = ['insert', 'update', 'delete', 'truncate', 'merge', 'create', 'alter', 'drop', 'rename', 'comment',
-        'grant', 'revoke', 'begin', 'commit', 'rollback', 'savepoint', 'release', 'execute', 'do', 'set', 'load', 'listen', 'notify'
-       ]
-        
-        for word in bad_words:
-            if word in query.lower():
-                self.logger.error("====== POTENTIALLY MALICIOUS QUERY ======")
-                return ""
         
         return query
 
