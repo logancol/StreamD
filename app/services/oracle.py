@@ -1,17 +1,14 @@
-import psycopg2
-from psycopg2.extensions import connection
+import psycopg
 from openai import OpenAI
 from fastapi import HTTPException
 
 
 class Oracle():
-    def __init__(self, logger, schema: str, client: OpenAI, conn: connection):
+    def __init__(self, logger, schema: str, client: OpenAI):
         # implement connection pooling at some point
         self.client = client
         self.logger = logger
-        self.conn = conn
         self.schema = schema
-        
 
     def sanitize_sql(self, query: str):
         if len(query) == 0:
@@ -30,8 +27,8 @@ class Oracle():
 
         bad_words = ['insert', 'update', 'delete', 'truncate', 'merge', 'create', 'alter', 'drop', 'rename', 'comment',
         'grant', 'revoke', 'begin', 'commit', 'rollback', 'savepoint', 'release', 'execute', 'do', 'set', 'load', 'listen', 'notify'
-        ]
-
+       ]
+        
         for word in bad_words:
             if word in query.lower():
                 self.logger.error("====== POTENTIALLY MALICIOUS QUERY ======")
@@ -39,28 +36,24 @@ class Oracle():
         
         return query
 
-      # Returns empty dict if the query has sanitization issues or if there's a problem running against the databse
-    def execute_sql(self, query: str):
+    # Async database operation returns empty dict if the query has sanitization issues or if there's a problem running against the databse
+    async def execute_sql(self, query: str, conn: psycopg.AsyncConnection):
         self.logger.info("====== EXECUTING SQL QUERY ======")
         # QUERY VALIDATION
 
         sanitizedQuery = self.sanitize_sql(query)
         if not sanitizedQuery:
             return {}
-            
-        cur = self.conn.cursor()
-        # Consider implementing connection pooling
-        try:
-            cur.execute(sanitizedQuery)
-            cols = [desc[0] for desc in cur.description]
-            rows = cur.fetchall()
-            return {"columns": cols, "rows": rows}
-        except psycopg2.Error as e:
-            self.logger.error(f"====== PROBLEM RUNNING QUERY ON PBP DATA: {e} ======")
-            return {}
-        finally:
-            cur.close()
-
+        
+        async with conn.cursor() as cur:
+            try:
+                await cur.execute(sanitizedQuery)
+                cols = [desc[0] for desc in cur.description]
+                rows = await cur.fetchall()
+                return {"columns": cols, "rows": rows}
+            except psycopg.Error as e:
+                self.logger.error(f"====== PROBLEM RUNNING QUERY ON PBP DATA: {e} ======")
+                return {}
 
     def get_sql_from_question(self, question: str):
         self.logger.info("====== GETTING SQL FROM USER QUESTION ======")
@@ -118,14 +111,14 @@ class Oracle():
         finally:
             return answer
         
-    def ask_oracle(self, question: str):
+    async def ask_oracle(self, question: str, conn: psycopg.AsyncConnection):
         self.logger.info('GET /query')
 
         sql = self.get_sql_from_question(question)
         if not sql:
             raise HTTPException(status_code=500, detail="Problem generating query")
     
-        database_answer = self.execute_sql(sql)
+        database_answer = await self.execute_sql(query=sql, conn=conn)
         if not database_answer:
             raise HTTPException(status_code=500, detail="Problem querying databse")
 

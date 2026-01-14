@@ -1,16 +1,47 @@
-from fastapi import FastAPI, HTTPException
-import psycopg2
+from fastapi import FastAPI, HTTPException, Depends
 from openai import OpenAI
-from core.config import settings
+from typing import Annotated
+from app.core.config import settings
 import logging
 import sys
-from services.oracle import Oracle
+from contextlib import asynccontextmanager
+from fastapi.security import OAuth2PasswordRequestForm
+from app.auth.token import Token
+from app.db.db import get_async_pool, get_pool
+from app.api.questions import router as questions_router
 
-# Fast API app setup
-app = FastAPI(title="BBALL ORACLE")
 # Logger setup
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    format="%(asctime)s [%(processName)s: %(process)d] [%(threadName)s: %(thread)d] "
+           "[%(levelname)s] %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    OPENAI_API_KEY = settings.OPENAI_API_KEY
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is not set or not loaded")
+    
+    # instantiating openai client as part of global state
+    app.state.openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    schema_path = settings.SCHEMA_PATH
+    try: # loading the db schema from file one time to avoid doing it repetitivly
+        with open(schema_path, 'r') as file:
+            app.state.schema = file.read()
+    except FileNotFoundError:
+        logger.error(f"====== Schema file not found: {schema_path} ======")
+        return
+    get_pool().open()
+    await get_async_pool().open()
+    try:
+        yield
+    finally:
+        await get_async_pool().close()
+        get_pool().close()
+app = FastAPI(lifespan=lifespan, title="BBALL ORACLE")
 
 # Stream handler for uvicorn console
 stream_handler = logging.StreamHandler(sys.stdout)
@@ -18,41 +49,4 @@ log_formatter = logging.Formatter("%(asctime)s [%(processName)s: %(process)d] [%
 stream_handler.setFormatter(log_formatter)
 logger.addHandler(stream_handler)
 
-# ENV vars
-DB_URL = settings.DATABASE_URL
-OPENAI_API_KEY = settings.OPENAI_API_KEY
-if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY is not set or not loaded")
-
-try:
-    client = OpenAI(
-    api_key=OPENAI_API_KEY
-    )
-except Exception as e:
-    logger.error(f"====== Problem creating OpenAI client ======")
-    raise
-
-schema_path = settings.SCHEMA_PATH
-SCHEMA = ""
-try:
-    with open(schema_path, 'r') as file:
-        SCHEMA = file.read()
-except FileNotFoundError:
-    logger.error(f"====== Schema file not found: {schema_path} ======")
-    raise
-
-
-@app.get("/query")
-def get_answer(question: str) -> str:
-    conn = psycopg2.connect(DB_URL)
-    try:
-        oracle = Oracle(logger=logger, schema=SCHEMA, client=client, conn=conn)
-        return oracle.ask_oracle(question)
-    finally:
-        conn.close()
-
-@app.post('/token')
-def token():
-    # finish implementing authentication logic
-    # https://www.youtube.com/watch?v=I11jbMOCY0c 12:30
-    return
+app.include_router(questions_router)

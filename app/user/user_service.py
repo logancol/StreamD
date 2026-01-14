@@ -9,8 +9,8 @@ DB_URL = settings.DATABASE_URL
 def init_db():
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS user (
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         full_name VARCHAR(256),
         username VARCHAR(256) UNIQUE NOT NULL,
@@ -26,7 +26,7 @@ def init_db():
 def get_user_by_username(username: str) -> Optional[dict]:
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
-    cur.execute("SELECT username, password_hash, email, full_name FROM user WHERE username = %s", (username,))
+    cur.execute("SELECT username, password_hash, email, full_name FROM users WHERE username = %s", (username,))
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -37,7 +37,7 @@ def get_user_by_username(username: str) -> Optional[dict]:
 def get_user_by_email(email: str) -> Optional[dict]:
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
-    cur.execute("SELECT username, password_hash, email, full_name FROM user WHERE email = %s", (email,))
+    cur.execute("SELECT username, password_hash, email, full_name FROM users WHERE email = %s", (email,))
     row = cur.fetchone()
     cur.close()
     conn.close()
@@ -45,15 +45,16 @@ def get_user_by_email(email: str) -> Optional[dict]:
        return {"username": row[0], "password_hash": row[1], "email": row[2], "full_name": row[3]}
     return None
 
-def create_user(username: str, password_hash: str, email: str = "", full_name: str = ""):
+def create_user(username: str, password: str, email: str = "", full_name: str = ""):
     conn = psycopg2.connect(DB_URL)
     cur = conn.cursor()
+    password_hash = get_password_hash(password)
     try: 
         cur.execute(
-            "INSERT INTO user (username, full_name, password_hash, email) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO users (username, full_name, password_hash, email) VALUES (%s, %s, %s, %s)",
             (username, full_name, password_hash, email)
         )
-        cur.commit()
+        conn.commit()
     except psycopg2.Error as e:
         raise HTTPException(status_code=409, detail="This username is already in use.")
     finally: 

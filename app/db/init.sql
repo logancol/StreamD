@@ -1,4 +1,11 @@
-CREATE TABLE user (
+
+-- Setting up role for oracle object to query database with write protection
+-- CREATE ROLE oracle_readonly NOLOGIN;
+-- CREATE USER oracle_app WITH PASSWORD ;
+-- GRANT oracle_readonly TO oracle_app;
+-- ALTER ROLE oracle_app SET default_transaction_read_only = on;
+
+CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     full_name VARCHAR(256),
     username VARCHAR(256) UNIQUE NOT NULL,
@@ -30,7 +37,7 @@ CREATE TABLE historical_team_index
 CREATE TABLE modern_team_index
 (
     id BIGINT, 
-    abrev VARCHAR(3),q
+    abrev VARCHAR(3),
     nickname VARCHAR(256),
     PRIMARY KEY(id, abrev)
 );
