@@ -1,4 +1,12 @@
-CREATE TABLE player
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    full_name VARCHAR(256),
+    password_hash VARCHAR(256) NOT NULL,
+    email VARCHAR(256) UNIQUE,
+    created_at TIMESTAMP DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS player
 (
     id BIGINT PRIMARY KEY,
     full_name VARCHAR(256),
@@ -7,7 +15,7 @@ CREATE TABLE player
     is_active BOOLEAN
 );
 
-CREATE TABLE historical_team_index
+CREATE TABLE IF NOT EXISTS historical_team_index
 (
     id BIGINT,
     current_iteration BOOLEAN,
@@ -18,7 +26,7 @@ CREATE TABLE historical_team_index
     PRIMARY KEY(id, nickname, year_active_til)
 );
 
-CREATE TABLE modern_team_index
+CREATE TABLE IF NOT EXISTS modern_team_index
 (
     id BIGINT, 
     abrev VARCHAR(3),
@@ -26,7 +34,7 @@ CREATE TABLE modern_team_index
     PRIMARY KEY(id, abrev)
 );
 
-CREATE TABLE game
+CREATE TABLE IF NOT EXISTS game
 (
     id BIGINT PRIMARY KEY,
     season_id INT,
@@ -41,7 +49,7 @@ CREATE TABLE game
     FOREIGN KEY (away_team_id, away_team_abrev) REFERENCES modern_team_index (id, abrev)
 );
 
-CREATE TABLE game_team_performance
+CREATE TABLE IF NOT EXISTS game_team_performance
 (
     game_id BIGINT REFERENCES game(id),
     team_id BIGINT,
@@ -71,15 +79,17 @@ CREATE TABLE game_team_performance
     FOREIGN KEY (team_id, team_abrev) REFERENCES modern_team_index (id, abrev)
 );
 
-CREATE TABLE pbp_raw_event(
+CREATE TABLE IF NOT EXISTS pbp_raw_event(
     game_id BIGINT REFERENCES game(id),
+    season_id INT,
+    season_type TEXT,
     event_num INT NOT NULL,    
     event_type TEXT NOT NULL,  
     event_subtype TEXT,    
     home_score INT,
     away_score INT,
     period INT NOT NULL,
-    clock INTERVAL NOT NULL, 
+    clock INTERVAL, 
     home_team_id BIGINT,
     away_team_id BIGINT,
     home_team_abrev VARCHAR(3),
@@ -147,6 +157,8 @@ Enumeration for event_type: ['period', 'jumpball', '2pt', 'rebound', '3pt', 'tur
        'foul', 'timeout', 'block', 'freethrow', 'substitution',
        'violation', 'game', 'ejection']
 
+STEALS ARE REPRESENTED THROUGH TURNOVER EVENTS, IF A PLAYER STEALS, THEY'D BE LOGGED WITH stealer_id FOR THAT EVENT 
+
 Enumeration for decriptor: [nan, 'startperiod', 'pullup', 'floating', 'running', 'driving',
        'driving floating', 'fadeaway', 'tip', 'step back',
        'running pullup', 'loose ball', 'shooting', 'cutting',
@@ -174,12 +186,7 @@ Enumeration for area_detail; [nan, '16-24 Center', '24+ Left Center', '0-8 Cente
 Enumeration for side: [None, 'right', 'left']
 
 'violation' eventType subtypes: ['kicked ball', 'defensive goaltending', 'delay-of-game', 'lane']
-
-STEALS ARE REPRESENTED THROUGH TURNOVER EVENTS, IF A PLAYER STEALS, THEY'D BE LOGGED WITH stealer_id FOR THAT EVENT 
-
-SEASON IDS HAVE FORMAT 22025/42025, THE FIRST DIGIT BEING 2 OR 4 WITH 2 REPRESENTING REGULAR SEASON AND 4 REPRESENTING POST SEASON OR Playoffs
 */
-
 
 
 

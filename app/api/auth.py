@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from typing import Annotated
 from datetime import timedelta
 import logging 
 from psycopg import AsyncConnection
 from app.models.token import Token
-from app.models.user import UserCreate, UserInDB, UserPublic
+from app.models.user import UserCreate
 from app.services.auth_service import authenticate_user, create_access_token
 from app.services.user_service import create_user
-from app.db.db import get_async_conn
+from app.db.db import get_async_conn_rw, get_async_conn_ar
+from app.rate_limiting import limiter
 
 router = APIRouter(prefix='/auth', tags=['Auth'])
 
@@ -18,7 +19,8 @@ log = logging.getLogger(__name__)
 # added use of pydantic models for input/output 
 
 @router.post("/login")
-async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], conn: AsyncConnection = Depends(get_async_conn)) -> Token:
+@limiter.limit("2/minute")
+async def login_for_access_token(request: Request, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], conn: AsyncConnection = Depends(get_async_conn_ar)) -> Token:
     user = await authenticate_user(email=form_data.username, password=form_data.password, conn=conn)
     if not user:
         raise HTTPException(
@@ -33,7 +35,8 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
     return Token(access_token=access_token, token_type="bearer", expires_in=1440 * 60)
     
 @router.post("/register")
-async def register_user(new_user: UserCreate, conn: AsyncConnection = Depends(get_async_conn)):
+@limiter.limit("2/minute")
+async def register_user(request: Request, new_user: UserCreate, conn: AsyncConnection = Depends(get_async_conn_rw)):
     user_public = await create_user(user=new_user, conn=conn)
     if not user_public:
         raise HTTPException(

@@ -8,19 +8,6 @@ from app.models.user import UserCreate, UserPublic, UserInDB
 
 DB_URL = settings.DATABASE_URL
 
-def init_db(conn: psycopg.connection):
-    with conn.transaction():
-        with conn.cursor() as cur:
-            cur.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                full_name VARCHAR(256),
-                password_hash VARCHAR(256) NOT NULL,
-                email VARCHAR(256) UNIQUE,
-                created_at TIMESTAMP DEFAULT now()
-            );
-            """)
-
 async def get_user_by_email(conn: AsyncConnection, email: str) -> Optional[UserInDB]:
     async with conn.cursor() as cur:
         await cur.execute(

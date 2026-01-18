@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Literal
+from typing import Literal, Optional
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
     JWT_SECRET_KEY: str
     DATABASE_URL: str
+    DATABASE_URL_RW: str
+    DATABASE_URL_AUTHR: str
     OPENAI_API_KEY: str
     SCHEMA_PATH: str
 

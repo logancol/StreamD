@@ -13,7 +13,7 @@ class UserBase(BaseModel):
     @classmethod
     def email_validator(cls, v: str):
         if not re.search(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", v):
-            raise ValidationError("Invalid email")
+            raise ValueError("Invalid email")
         return v
         
     full_name: Union[str, None]
@@ -24,11 +24,13 @@ class UserCreate(UserBase):
 
     @field_validator("password")
     @classmethod
-    def password_strength(cls, v: str) -> str: # setting up in case I want to change password validation requirements
+    def password_strength(cls, v: str) -> str: 
         if len(v) < 8:
-            raise ValidationError("Password should be at least 8 characters")
+            raise ValueError("Password should be at least 8 characters")
         if not re.search(r"[^\w\s]", v):
-            raise ValidationError("Password must contain a special character")
+            raise ValueError("Password must contain a special character")
+        if len(v) > 50:
+            raise ValueError("Password too long")
         return v
 
 # explicit definition of what we want to make public to users, which would just be their email and optionally full name

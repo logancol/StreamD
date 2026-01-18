@@ -1,22 +1,24 @@
 # nightly updates (game, pbp, new players)
-from scripts.loadPlayer import PlayerLoader
-from scripts.loadPBP import PBPDataLoader
+from Loaders.loadPlayer import PlayerLoader
+from Loaders.loadPBP import PBPDataLoader
 import psycopg
 from app.core.config import settings
-from scripts.loadGame import GameLoader
+from Loaders.loadGame import GameLoader
 
 # -> update player index -> update game data -> update play by play data
 def main():
-    DB_URL = settings.DATABASE_URL
+    DB_URL = settings.DATABASE_URL_RW
     with psycopg.connect(DB_URL) as conn:
         with conn.transaction():
             loader = PlayerLoader(conn)
             with conn.cursor() as cur:
                 loader.load_player_index(cur)
+                
     with psycopg.connect(DB_URL) as conn:
         with conn.transaction():
             game_loader = GameLoader(conn, update=True)
             game_loader.load_games()
+            
     with psycopg.connect(DB_URL) as conn:
         data_loader = PBPDataLoader(conn, update=True)
         data_loader.load_pbp_data()

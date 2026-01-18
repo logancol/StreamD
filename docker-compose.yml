@@ -1,6 +1,6 @@
 services:
   database:
-    image: postgres
+    image: postgres:16
     container_name: streamd_db
     ports:
       - 5431:5432
@@ -9,3 +9,15 @@ services:
       POSTGRES_USER: docker
       POSTGRES_PASSWORD: docker
       POSTGRES_DB: streamd
+
+      ORACLE_APP_PASSWORD: "${ORACLE_APP_PASSWORD:?set ORACLE_APP_PASSWORD}"
+      APP_RW_PASSWORD: "${APP_RW_PASSWORD:?set APP_RW_PASSWORD}"
+      AUTH_R_PASSWORD: "${AUTH_R_PASSWORD:?set AUTH_R_PASSWORD}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./app/db/init/init.sh:/docker-entrypoint-initdb.d/00-init-roles.sh:ro
+      - ./app/db/init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./app/db/grants.sql:/docker-entrypoint-initdb.d/02-grants.sql:ro
+
+volumes:
+  pgdata:

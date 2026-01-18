@@ -2,10 +2,10 @@ from app.core.config import settings
 from typing import Annotated, Optional
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import HTTPException, Depends
-from app.db.db import get_async_conn
+from app.db.db import get_async_conn_ar
 from psycopg import AsyncConnection
 from app.models.token import TokenData
-from app.models.user import UserCreate, UserInDB, UserPublic
+from app.models.user import UserInDB
 from datetime import datetime, timedelta, timezone
 import jwt
 from jwt.exceptions import InvalidTokenError
@@ -37,7 +37,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=ALGORITHM)
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], conn: AsyncConnection = Depends(get_async_conn)) -> UserInDB:
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], conn: AsyncConnection = Depends(get_async_conn_ar)) -> UserInDB:
     credentials_exception = HTTPException(
         status_code = 401,
         detail="Could not validate user credentials",

@@ -1,6 +1,8 @@
 import psycopg
 from openai import OpenAI
 from fastapi import HTTPException
+from app.models.reqres import QuestionBase
+import re
 
 
 class Oracle():
@@ -10,21 +12,36 @@ class Oracle():
         self.logger = logger
         self.schema = schema
 
-    def sanitize_sql(self, query: str):
-        if len(query) == 0:
+    def sanitize_sql(self, query: str) -> str:
+        if not query or not query.strip():
             self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED EMPTY STRING ======")
             return ""
-        
-        if (len(query) > 5000):
+
+        query = query.strip()
+
+        if len(query) > 5000:
             self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED EXCESSIVELY LONG STRING ======")
             return ""
-        
-        lower_query = query.lower()
 
-        if 'select' not in lower_query:
+        lower = query.lower()
+
+        if not (lower.startswith("select") or lower.startswith("with")):
             self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED NON-SELECTING QUERY ======")
             return ""
         
+        if ";" in query:
+            self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED MULTI-STATEMENT QUERY ======")
+            return ""
+        
+        if "--" in query or "/*" in query:
+            self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED COMMENTED QUERY ======")
+            return ""
+
+        blocked = r"\b(insert|update|delete|drop|alter|create|grant|revoke|truncate|call|copy)\b"
+        if re.search(blocked, lower):
+            self.logger.error("====== SQL SANITIZATION FUNCTION RECEIVED DISALLOWED KEYWORD ======")
+            return ""
+
         return query
 
     # Async database operation returns empty dict if the query has sanitization issues or if there's a problem running against the databse
@@ -65,10 +82,7 @@ class Oracle():
         try:
             response = self.client.responses.create(
                 model="gpt-5.2",
-                input=prompt,
-                reasoning={
-                    "effort": "medium"
-                }
+                input=prompt
             )
             sql = response.output_text.strip()
             sql = sql.split("```")[0].strip() # Remove markdown delimeters

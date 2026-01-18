@@ -1,15 +1,15 @@
 # initial non-update loading for all data
-from scripts.loadPlayer import PlayerLoader
-from scripts.loadPBP import PBPDataLoader
+from Loaders.loadPlayer import PlayerLoader
+from Loaders.loadPBP import PBPDataLoader
 import psycopg
 from app.core.config import settings
-from scripts.loadGame import GameLoader
-from scripts.loadTeam import TeamLoader
+from Loaders.loadGame import GameLoader
+from Loaders.loadTeam import TeamLoader
 
 # -> update player index -> update game data -> update play by play data
 def main():
-    DB_URL = settings.DATABASE_URL
-    with psycopg.connect(DB_URL) as conn:
+    DB_URL = settings.DATABASE_URL_RW
+    with psycopg.connect(DB_URL) as conn: # with pattern for context management
         with conn.transaction():
             loader = TeamLoader(conn)
             with conn.cursor() as cur:
