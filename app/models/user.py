@@ -1,24 +1,12 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, ValidationError
-from typing import Union
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, Field
+from typing import Optional
 import re
 
-
-# base user model validates that email is an expected shape, full name optional
-# in all contexts a user must be identified by email
 class UserBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
     email: EmailStr
+    full_name: Optional[str] = Field(max_length=256)
 
-    @field_validator("email")
-    @classmethod
-    def email_validator(cls, v: str):
-        if not re.search(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", v):
-            raise ValueError("Invalid email")
-        return v
-        
-    full_name: Union[str, None]
-
-# accepts password and validates
 class UserCreate(UserBase):
     password: str
 
@@ -32,12 +20,8 @@ class UserCreate(UserBase):
         if len(v) > 50:
             raise ValueError("Password too long")
         return v
-
-# explicit definition of what we want to make public to users, which would just be their email and optionally full name
-class UserPublic(UserBase):
     model_config = ConfigDict(extra="forbid")
 
-# never expose
 class UserInDB(UserBase):
     model_config = ConfigDict(extra="forbid")
     password_hash: str

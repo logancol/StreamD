@@ -57,7 +57,7 @@ class Oracle():
             try:
                 await cur.execute(sanitizedQuery)
                 cols = [desc[0] for desc in cur.description]
-                rows = await cur.fetchall()
+                rows = await cur.fetchmany(200) # hard-coded safeguard for now
                 return {"columns": cols, "rows": rows}
             except psycopg.Error as e:
                 self.logger.error(f"====== PROBLEM RUNNING QUERY ON PBP DATA: {e} ======")

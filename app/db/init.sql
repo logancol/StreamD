@@ -1,8 +1,10 @@
+CREATE EXTENSION IF NOT EXISTS citext;
+
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     full_name VARCHAR(256),
     password_hash VARCHAR(256) NOT NULL,
-    email VARCHAR(256) UNIQUE,
+    email CITEXT NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT now()
 );
 
