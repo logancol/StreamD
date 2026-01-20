@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("RO DATABASE URL NOT SET OR LOADED")
     if not settings.DATABASE_URL_RW:
         raise RuntimeError("RW DATABASE URL NOT SET OR LOADED")
-    if not settings.DATABASE_URL_AUTHR:
+    if not settings.DATABASE_URL_AUTH_RO:
         raise RuntimeError("AR DATABASE URL NOT SET OR LOADED")
     
     # instantiating openai client as part of global state

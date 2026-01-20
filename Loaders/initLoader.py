@@ -24,11 +24,11 @@ def main():
 
     with psycopg.connect(DB_URL) as conn:
         with conn.transaction():
-            game_loader = GameLoader(conn, update=False)
+            game_loader = GameLoader(conn, update=False, whole_current_season=False)
             game_loader.load_games()
 
     with psycopg.connect(DB_URL) as conn:
-        data_loader = PBPDataLoader(conn, update=False)
+        data_loader = PBPDataLoader(conn, update=False, whole_current_season=False)
         data_loader.load_pbp_data()
 
 

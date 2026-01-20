@@ -4,7 +4,6 @@ from fastapi import HTTPException
 from app.models.reqres import QuestionBase
 import re
 
-
 class Oracle:
     def __init__(self, logger, schema: str, client: OpenAI):
         # implement connection pooling at some point
@@ -33,8 +32,9 @@ class Oracle:
             self.logger.error("SQL SANITIZATION FUNCTION RECEIVED COMMENTED QUERY")
             return ""
         
-        if ";" in query:
-            self.logger.error("MULTI STATEMENT QUERY")
+        if query.count(';') > 1:
+            self.logger.error("POSSIBLE MULTI-STATEMENT QUERY")
+            return ""
 
         blocked = r"\b(insert|update|delete|drop|alter|create|grant|revoke|truncate|call|copy)\b"
         if re.search(blocked, lower):
@@ -66,7 +66,7 @@ class Oracle:
         self.logger.info("GETTING SQL FROM USER QUESTION")
         prompt = f"""
         You are a PostgreSQL query planner for NBA statistical data. You generate SQL to query the NBA database to answer natural language questions about
-        player/team statistics. Do NOT explain results in prose. Return valid SQL ONLY.
+        player/team statistics. Do NOT explain results in prose. Return valid SQL ONLY. Remember that you cannot round() with double precision.
 
         Below is the table schema, prioritize considering the value enumerations and other guidelines described in comments at the bottom of the schema to ensure an accurate response.
 
@@ -113,6 +113,86 @@ class Oracle:
         except Exception as e:
             self.logger.error(f"PROBLEM GETTING RESULT INTERPRETATION FROM OPENAI {e}")
         finally:
+            DB_SCHEMA_TERMS = [
+                "schema",
+                "database",
+                "table",
+                "column",
+                "row",
+                "record",
+                "field",
+                "attribute",
+                "relation",
+                "view",
+                "materialized_view",
+                "primary_key",
+                "foreign_key",
+                "unique_key",
+                "composite_key",
+                "candidate_key",
+                "surrogate_key",
+                "constraint",
+                "not_null",
+                "unique",
+                "check",
+                "default",
+                "references",
+                "referential_integrity",
+                "index",
+                "btree",
+                "hash",
+                "gist",
+                "gin",
+                "spgist",
+                "brin",
+                "pg_catalog",
+                "information_schema",
+                "pg_class",
+                "pg_attribute",
+                "pg_namespace",
+                "pg_index",
+                "pg_constraint",
+                "pg_type",
+                "create",
+                "alter",
+                "drop",
+                "truncate",
+                "grant",
+                "revoke",
+                "join",
+                "inner_join",
+                "left_join",
+                "right_join",
+                "full_join",
+                "transaction",
+                "commit",
+                "rollback",
+                "acid",
+                "partition",
+                "partition_key",
+                "tablespace",
+                "sequence",
+                "serial",
+                "bigserial",
+                "varchar",
+                "char",
+                "text",
+                "integer",
+                "bigint",
+                "boolean",
+                "timestamp",
+                "json",
+                "jsonb",
+                "uuid",
+                "user",
+                "owner",
+                "privilege"
+            ]
+            for bad_word in DB_SCHEMA_TERMS:
+                if bad_word in answer.lower():
+                    self.logger.error("Problematic term encountered in GPT elaboration")
+                    self.logger.error(answer)
+                    return ""
             return answer
         
     async def ask_oracle(self, question: str, conn: psycopg.AsyncConnection):

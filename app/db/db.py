@@ -1,12 +1,12 @@
 from functools import lru_cache
-from psycopg_pool import ConnectionPool, AsyncConnectionPool
+from psycopg_pool import AsyncConnectionPool
 
 from app.core.config import settings
 
 # urls for respective roles
 DB_URL_RO = settings.DATABASE_URL
 DB_URL_RW = settings.DATABASE_URL_RW
-DB_URL_AR = settings.DATABASE_URL_AUTHR
+DB_URL_AR = settings.DATABASE_URL_AUTH_RO
 
 # opening connection pools with each role
 @lru_cache

@@ -8,12 +8,12 @@ class Settings(BaseSettings):
         extra="ignore",
         env_ignore_empty = True,
     )
-    DOMAIN: str = 'localhost'
-    ENVIRONMENT: Literal["local", "staging", "production"] = "local"
+    ENVIRONMENT: Literal["local", "production"] = "local"
     JWT_SECRET_KEY: str
     DATABASE_URL: str
     DATABASE_URL_RW: str
-    DATABASE_URL_AUTHR: str
+    DATABASE_URL_AUTH_RO: str
+    DATABASE_URL_MIGRATIONS: str
     OPENAI_API_KEY: str
     SCHEMA_PATH: str
 

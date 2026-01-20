@@ -9,10 +9,11 @@ from nba_api.stats.endpoints import leaguegamefinder
 from datetime import datetime, timedelta, date
 
 class GameLoader:
-    def __init__(self, db_connection, update: bool):
+    def __init__(self, db_connection, update: bool, whole_current_season: bool):
         # Configure database connection, logger
         self.conn = db_connection
         self.update = update
+        self.whole_current_season = whole_current_season
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         if not self.logger.handlers:
@@ -119,13 +120,18 @@ class GameLoader:
         with self.conn.cursor() as cur:
             for id in self.team_ids:
                 self.logger.info(f'LOADING {"CURRENT SEASON" if self.update else "ALL"} GAMES FOR TEAM {id}')
-                if self.update:
+                if self.update or self.whole_current_season:
+                    if self.whole_current_season:
+                        date_from_nullable = None
+                    else:
+                        date_from_nullable = (date.today() - timedelta(days=3))
+
                     gamefinder_regular = self._with_retry(
-                        lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Regular Season", season_nullable='2025-26', date_from_nullable=(date.today() - timedelta(days=3))),
+                        lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Regular Season", season_nullable='2025-26', date_from_nullable=date_from_nullable),
                         desc=f"Regular season games for 2025/26 season for team {id}"
                     )
                     gamefinder_playoff = self._with_retry(
-                        lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Playoffs", season_nullable='2025-26', date_from_nullable=(date.today() - timedelta(days=3))),
+                        lambda: leaguegamefinder.LeagueGameFinder(team_id_nullable=id, season_type_nullable="Playoffs", season_nullable='2025-26', date_from_nullable=date_from_nullable),
                         desc=f"Playoff games for 2025/26 season for team {id}"
                     )
 

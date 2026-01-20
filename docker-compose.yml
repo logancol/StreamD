@@ -25,10 +25,9 @@ services:
       POSTGRES_USER: docker
       POSTGRES_PASSWORD: docker
       POSTGRES_DB: streamd
-
-      ORACLE_APP_PASSWORD: "${ORACLE_APP_PASSWORD:?set ORACLE_APP_PASSWORD}"
+      ORACLE_RO_PASSWORD: "${ORACLE_RO_PASSWORD:?set ORACLE_RO_PASSWORD}"
       APP_RW_PASSWORD: "${APP_RW_PASSWORD:?set APP_RW_PASSWORD}"
-      AUTH_R_PASSWORD: "${AUTH_R_PASSWORD:?set AUTH_R_PASSWORD}"
+      AUTH_RO_PASSWORD: "${AUTH_RO_PASSWORD:?set AUTH_RO_PASSWORD}"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./app/db/init.sh:/docker-entrypoint-initdb.d/00-init-roles.sh:ro

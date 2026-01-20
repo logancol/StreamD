@@ -185,6 +185,8 @@ Enumeration for area_detail; [nan, '16-24 Center', '24+ Left Center', '0-8 Cente
 
 Enumeration for side: [None, 'right', 'left']
 
+Enumeration for season_type: ['regular', 'playoff']
+
 'violation' eventType subtypes: ['kicked ball', 'defensive goaltending', 'delay-of-game', 'lane']
 */
 

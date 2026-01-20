@@ -11,9 +11,10 @@ import logging
 
 class PBPDataLoader:
     # --- Configure db connection and logging ---
-    def __init__(self, db_connection, update: bool):
+    def __init__(self, db_connection, update: bool, whole_current_season: bool):
         self.conn = db_connection
         self.logger = logging.getLogger(__name__)
+        self.whole_current_season = whole_current_season
         self.logger.setLevel(logging.DEBUG)
         if not self.logger.handlers:
             stream_handler = logging.StreamHandler(sys.stdout)
@@ -60,7 +61,6 @@ class PBPDataLoader:
         sec_int = int(seconds)
         microsec = int((seconds - sec_int) * 1_000_000)
         interval_str = f"{hours} hours {minutes} minutes {sec_int} seconds {microsec} microseconds"
-        
         return interval_str
     
     # --- helps validate type saftey for player ids, they occasionally come back as int, string, float, none
@@ -75,8 +75,10 @@ class PBPDataLoader:
 
     # ---  pbp data loader, either updates current season pbp data or fetches data for all years as part of init
     def load_pbp_data(self):    
-        if self.update:
-            season_ids = [22025]
+        if self.whole_current_season:
+            season_ids = [22025, 42025]
+        elif self.update:
+            season_ids = [22025, 42025]
         else:
             season_ids = [21996, 41996, 21997, 41997, 21998, 41998, 21999, 41999, 22000, 42000, 22001, 42001, 
                           22002, 42002, 22003, 42003, 22004, 42004, 22005, 42005, 22006, 42006, 22007, 42007, 
