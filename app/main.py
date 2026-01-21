@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
             app.state.schema = file.read()
     except FileNotFoundError:
         logger.error(f"Schema file not found: {schema_path}")
-        return
+        raise RuntimeError(f"Schmea file not found: {schema_path}")
     await get_async_pool_ro().open()
     await get_async_pool_rw().open()
     await get_async_pool_ar().open()

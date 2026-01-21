@@ -8,14 +8,20 @@ from app.models.token import TokenData
 from app.models.user import UserInDB
 from datetime import datetime, timedelta, timezone
 import jwt
+from bcrypt import checkpw
 from jwt.exceptions import InvalidTokenError
 from app.services.user_service import get_user_by_email
-from app.utils.auth_utils import verify_password
 
 JWT_SECRET_KEY = settings.JWT_SECRET_KEY
 ALGORITHM = "HS256"
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+def verify_password(plain_text: str, hashed_password: str):
+    try:
+        return checkpw(plain_text.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
 
 # user authentication returns model containing email, password, and password hash
 async def authenticate_user(password: str, email: str, conn: AsyncConnection) -> Optional[UserInDB]:
