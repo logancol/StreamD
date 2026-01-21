@@ -1,7 +1,6 @@
 import psycopg
 from openai import OpenAI
 from fastapi import HTTPException
-from app.models.reqres import QuestionBase
 import re
 
 class Oracle:
@@ -22,19 +21,22 @@ class Oracle:
             self.logger.error("SQL SANITIZATION FUNCTION RECEIVED EXCESSIVELY LONG STRING")
             return ""
 
-        lower = query.lower()
-
-        if not (lower.startswith("select") or lower.startswith("with")):
+        if not (query.lower().startswith("select") or query.lower().startswith("with")):
             self.logger.error("SQL SANITIZATION FUNCTION RECEIVED NON-SELECTING QUERY")
             return ""
         
         if "--" in query or "/*" in query:
             self.logger.error("SQL SANITIZATION FUNCTION RECEIVED COMMENTED QUERY")
             return ""
-        
-        if query.count(';') > 1:
+
+        if ";" in query[:-1]:
             self.logger.error("POSSIBLE MULTI-STATEMENT QUERY")
             return ""
+
+        if query.endswith(";"):
+            query = query[:-1].rstrip()
+
+        lower = query.lower()
 
         blocked = r"\b(insert|update|delete|drop|alter|create|grant|revoke|truncate|call|copy)\b"
         if re.search(blocked, lower):
@@ -54,7 +56,10 @@ class Oracle:
         
         async with conn.cursor() as cur:
             try:
-                await cur.execute(sanitizedQuery)
+                async with conn.transaction():
+                    await cur.execute("SET LOCAL statement_timeout = '2s'")
+                    await cur.execute("SET LOCAL lock_timeout = '1s'")
+                    await cur.execute(sanitizedQuery)
                 cols = [desc[0] for desc in cur.description]
                 rows = await cur.fetchmany(200) # hard-coded safeguard for now
                 return {"columns": cols, "rows": rows}

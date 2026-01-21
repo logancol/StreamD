@@ -28,11 +28,11 @@ async def login_for_access_token(request: Request, form_data: Annotated[OAuth2Pa
             detail="Incorrect email or password.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token_expires = timedelta(minutes=1440)
+    access_token_expires = timedelta(minutes=60)
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
-    return Token(access_token=access_token, token_type="bearer", expires_in=1440 * 60)
+    return Token(access_token=access_token, token_type="bearer", expires_in=60)
     
 @router.post("/register", response_model=UserPublic, status_code=201)
 @limiter.limit("10/minute")
